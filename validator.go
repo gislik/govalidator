@@ -940,6 +940,18 @@ func checkRequired(v reflect.Value, t reflect.StructField, options tagOptionsMap
 		return false, Error{t.Name, fmt.Errorf("non zero value required"), false, "required"}
 	} else if _, isOptional := options["optional"]; fieldsRequiredByDefault && !isOptional {
 		return false, Error{t.Name, fmt.Errorf("Missing required field"), false, "required"}
+	} else {
+		var hasValidator *string
+		for k := range options {
+			if k == "required" || k == "optional" || k == "-" {
+				continue
+			}
+			hasValidator = &k
+			break
+		}
+		if hasValidator != nil {
+			return false, nil
+		}
 	}
 	// not required and empty is valid
 	return true, nil
@@ -971,11 +983,21 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 
 	if isEmptyValue(v) {
 		// an empty value is not validated, check only required
-		isValid, resultErr = checkRequired(v, t, options)
-		for key := range options {
-			delete(options, key)
+		if isNullPointer(v) {
+			isValid = true
+			resultErr = nil
+			for key := range options {
+				delete(options, key)
+			}
+			return
+		} else {
+			isValid, resultErr = checkRequired(v, t, options)
+			if resultErr != nil {
+				return false, resultErr
+			} else if isValid == true {
+				return true, resultErr
+			}
 		}
-		return
 	}
 
 	var customTypeErrors Errors
@@ -987,6 +1009,9 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 				if len(customErrorMessage) > 0 {
 					customTypeErrors = append(customTypeErrors, Error{Name: t.Name, Err: fmt.Errorf(customErrorMessage), CustomErrorMessageExists: true, Validator: stripParams(validatorName)})
 					continue
+				}
+				if v.Kind() == reflect.Ptr {
+					v = v.Elem()
 				}
 				customTypeErrors = append(customTypeErrors, Error{Name: t.Name, Err: fmt.Errorf("%s does not validate as %s", fmt.Sprint(v), validatorName), CustomErrorMessageExists: false, Validator: stripParams(validatorName)})
 			}
@@ -1143,6 +1168,8 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		return ValidateStruct(v.Interface())
 	case reflect.Ptr:
 		// If the value is a pointer then check its element
+		fmt.Printf("%#v\n", v)
+		fmt.Printf("%#v\n", v.Elem())
 		if v.IsNil() {
 			return true, nil
 		}
@@ -1172,11 +1199,18 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.Uint() == 0
 	case reflect.Float32, reflect.Float64:
 		return v.Float() == 0
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface:
 		return v.IsNil()
 	}
 
 	return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface())
+}
+
+func isNullPointer(v reflect.Value) bool {
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		return true
+	}
+	return false
 }
 
 // ErrorByField returns error for specified field of the struct
