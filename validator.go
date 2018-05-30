@@ -1168,8 +1168,6 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		return ValidateStruct(v.Interface())
 	case reflect.Ptr:
 		// If the value is a pointer then check its element
-		fmt.Printf("%#v\n", v)
-		fmt.Printf("%#v\n", v.Elem())
 		if v.IsNil() {
 			return true, nil
 		}
