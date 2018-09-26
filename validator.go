@@ -703,7 +703,7 @@ func toJSONName(tag string) string {
 
 // ValidateStruct use tags for fields.
 // result will be equal to `false` if there are any errors.
-func ValidateStruct(s interface{}) (bool, error) {
+func ValidateStruct(s interface{}, allowNull bool) (bool, error) {
 	if s == nil {
 		return true, nil
 	}
@@ -729,12 +729,12 @@ func ValidateStruct(s interface{}) (bool, error) {
 			(valueField.Kind() == reflect.Ptr && valueField.Elem().Kind() == reflect.Struct)) &&
 			typeField.Tag.Get(tagName) != "-" {
 			var err error
-			structResult, err = ValidateStruct(valueField.Interface())
+			structResult, err = ValidateStruct(valueField.Interface(), allowNull)
 			if err != nil {
 				errs = append(errs, err)
 			}
 		}
-		resultField, err2 := typeCheck(valueField, typeField, val, nil)
+		resultField, err2 := typeCheck(valueField, typeField, val, nil, allowNull)
 		if err2 != nil {
 
 			// Replace structure name with JSON name if there is a tag on the variable
@@ -950,6 +950,9 @@ func checkRequired(v reflect.Value, t reflect.StructField, options tagOptionsMap
 			break
 		}
 		if hasValidator != nil {
+			if isNullPointer(v) {
+				return false, Error{t.Name, fmt.Errorf("Missing required field"), false, "required"}
+			}
 			return false, nil
 		}
 	}
@@ -957,7 +960,7 @@ func checkRequired(v reflect.Value, t reflect.StructField, options tagOptionsMap
 	return true, nil
 }
 
-func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options tagOptionsMap) (isValid bool, resultErr error) {
+func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options tagOptionsMap, allowNull bool) (isValid bool, resultErr error) {
 	if !v.IsValid() {
 		return false, nil
 	}
@@ -983,7 +986,7 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 
 	if isEmptyValue(v) {
 		// an empty value is not validated, check only required
-		if isNullPointer(v) {
+		if allowNull && isNullPointer(v) {
 			isValid = true
 			resultErr = nil
 			for key := range options {
@@ -1128,12 +1131,12 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 			var resultItem bool
 			var err error
 			if v.MapIndex(k).Kind() != reflect.Struct {
-				resultItem, err = typeCheck(v.MapIndex(k), t, o, options)
+				resultItem, err = typeCheck(v.MapIndex(k), t, o, options, allowNull)
 				if err != nil {
 					return false, err
 				}
 			} else {
-				resultItem, err = ValidateStruct(v.MapIndex(k).Interface())
+				resultItem, err = ValidateStruct(v.MapIndex(k).Interface(), allowNull)
 				if err != nil {
 					return false, err
 				}
@@ -1147,12 +1150,12 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 			var resultItem bool
 			var err error
 			if v.Index(i).Kind() != reflect.Struct {
-				resultItem, err = typeCheck(v.Index(i), t, o, options)
+				resultItem, err = typeCheck(v.Index(i), t, o, options, allowNull)
 				if err != nil {
 					return false, err
 				}
 			} else {
-				resultItem, err = ValidateStruct(v.Index(i).Interface())
+				resultItem, err = ValidateStruct(v.Index(i).Interface(), allowNull)
 				if err != nil {
 					return false, err
 				}
@@ -1165,15 +1168,15 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		if v.IsNil() {
 			return true, nil
 		}
-		return ValidateStruct(v.Interface())
+		return ValidateStruct(v.Interface(), allowNull)
 	case reflect.Ptr:
 		// If the value is a pointer then check its element
 		if v.IsNil() {
 			return true, nil
 		}
-		return typeCheck(v.Elem(), t, o, options)
+		return typeCheck(v.Elem(), t, o, options, allowNull)
 	case reflect.Struct:
-		return ValidateStruct(v.Interface())
+		return ValidateStruct(v.Interface(), allowNull)
 	default:
 		return false, &UnsupportedTypeError{v.Type()}
 	}
