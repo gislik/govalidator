@@ -941,6 +941,11 @@ func checkRequired(v reflect.Value, t reflect.StructField, options tagOptionsMap
 	} else if _, isOptional := options["optional"]; fieldsRequiredByDefault && !isOptional {
 		return false, Error{t.Name, fmt.Errorf("Missing required field"), false, "required"}
 	} else {
+		if _, isOptional := options["optional"]; isOptional {
+			return false, nil
+		} else if _, skip := options["-"]; skip {
+			return false, nil
+		}
 		var hasValidator *string
 		for k := range options {
 			if k == "required" || k == "optional" || k == "-" {
