@@ -994,18 +994,13 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		if allowNull && isNullPointer(v) {
 			isValid = true
 			resultErr = nil
-			for key := range options {
-				delete(options, key)
-			}
-			return
 		} else {
 			isValid, resultErr = checkRequired(v, t, options)
-			if resultErr != nil {
-				return false, resultErr
-			} else if isValid == true {
-				return true, resultErr
-			}
 		}
+		for key := range options {
+			delete(options, key)
+		}
+		return
 	}
 
 	var customTypeErrors Errors
