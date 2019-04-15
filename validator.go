@@ -1013,10 +1013,11 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 					customTypeErrors = append(customTypeErrors, Error{Name: t.Name, Err: fmt.Errorf(customErrorMessage), CustomErrorMessageExists: true, Validator: stripParams(validatorName)})
 					continue
 				}
-				if v.Kind() == reflect.Ptr {
-					v = v.Elem()
+				v2 := v
+				if v2.Kind() == reflect.Ptr {
+					v2 = v2.Elem()
 				}
-				customTypeErrors = append(customTypeErrors, Error{Name: t.Name, Err: fmt.Errorf("%s does not validate as %s", fmt.Sprint(v), validatorName), CustomErrorMessageExists: false, Validator: stripParams(validatorName)})
+				customTypeErrors = append(customTypeErrors, Error{Name: t.Name, Err: fmt.Errorf("%s does not validate as %s", fmt.Sprint(v2), validatorName), CustomErrorMessageExists: false, Validator: stripParams(validatorName)})
 			}
 		}
 	}
