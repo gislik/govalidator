@@ -1151,6 +1151,7 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 			var resultItem bool
 			var err error
 			if v.Index(i).Kind() != reflect.Struct {
+				delete(options, "required")
 				resultItem, err = typeCheck(v.Index(i), t, o, options, allowNull)
 				if err != nil {
 					return false, err
